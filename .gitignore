@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+
+# Streamlit specific
+.streamlit/config.toml
+.streamlit/credentials.toml
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# PyCharm/VSCode files
+.idea/
+.vscode/
+
+# MacOS system files
+.DS_Store
+
+# Log files
+*.log
+
+# Environment variable files
+.env
+
+# Cache
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+*.db
+*.sqlite3
+
+# Coverage reports
+htmlcov/
+.coverage
+.cache
+
+# Pipenv
+Pipfile.lock
+
+# pytest
+.pytest_cache/
