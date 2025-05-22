@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import plotly.express as px
 import re
 
@@ -17,6 +15,7 @@ st.set_page_config(
 # Custom CSS for better UI
 st.markdown("""
 <style>
+    /* General Styles */
     .main-header {
         font-size: 42px;
         font-weight: bold;
@@ -24,6 +23,11 @@ st.markdown("""
         text-align: center;
         margin-bottom: 30px;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    .main-header:hover {
+        color: #FF6B6B;
+        text-shadow: 3px 3px 6px rgba(0,0,0,0.2);
     }
     .sub-header {
         font-size: 26px;
@@ -31,31 +35,110 @@ st.markdown("""
         color: #FF8C00;
         margin-top: 20px;
         margin-bottom: 10px;
+        transition: color 0.3s ease;
     }
+    .sub-header:hover {
+        color: #FFA040;
+    }
+    
+    /* Card Styles */
     .card {
-        border-radius: 10px;
+        border-radius: 12px;
         background-color: #f8f9fa;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         padding: 20px;
         margin-bottom: 20px;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
     }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+        border-color: #FF4B4B;
+    }
+    
+    /* Text Styles */
     .highlight {
         color: #FF4B4B;
         font-weight: bold;
+        transition: color 0.3s ease;
+    }
+    .highlight:hover {
+        color: #FF6B6B;
     }
     .film-title {
         font-size: 18px;
         font-weight: bold;
         color: #343a40;
+        transition: all 0.3s ease;
     }
+    .film-title:hover {
+        color: #FF4B4B;
+    }
+    
+    /* Metrics Styles */
     .metric-label {
         font-size: 14px;
         color: #6c757d;
+        transition: color 0.3s ease;
     }
     .metric-value {
         font-size: 18px;
         font-weight: bold;
         color: #343a40;
+        transition: all 0.3s ease;
+    }
+    .metric-value:hover {
+        color: #FF4B4B;
+        transform: scale(1.05);
+    }
+    
+    /* Button Styles */
+    .stButton > button {
+        background-color: #FF4B4B;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background-color: #FF6B6B;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Expander Styles */
+    .streamlit-expanderHeader {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    .streamlit-expanderHeader:hover {
+        background-color: #FF4B4B15;
+    }
+    
+    /* Footer Styles */
+    .footer {
+        text-align: center;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        margin-top: 30px;
+    }
+    .footer a {
+        color: #FF4B4B;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+    .footer a:hover {
+        color: #FF6B6B;
+        text-decoration: underline;
+    }
+    .footer-text {
+        font-size: 14px;
+        color: #6c757d;
+        margin: 5px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -147,62 +230,7 @@ with st.sidebar:
         selected_genres = []
         selected_director = "All"
 
-# Create feature for recommendation
-@st.cache_data
-def create_feature_matrix(df):
-    features = []
-    
-    # Determine which columns to use as features
-    if 'Description' in df.columns or any('description' in col.lower() for col in df.columns):
-        desc_col = next(col for col in df.columns if 'description' in col.lower())
-        features.append(df[desc_col].fillna('').astype(str))
-    
-    if 'Genre' in df.columns or any('genre' in col.lower() for col in df.columns):
-        genre_col = next(col for col in df.columns if 'genre' in col.lower())
-        features.append(df[genre_col].fillna('').astype(str))
-    
-    if 'Director' in df.columns or any('director' in col.lower() for col in df.columns):
-        dir_col = next(col for col in df.columns if 'director' in col.lower())
-        features.append(df[dir_col].fillna('').astype(str))
-    
-    # Combine all features
-    if features:
-        combined_features = features[0]
-        for i in range(1, len(features)):
-            combined_features += ' ' + features[i]
-    else:
-        # If no suitable text features found, use the movie title
-        combined_features = df[movie_title_col].fillna('').astype(str)
-    
-    # Create TF-IDF matrix
-    tfidf = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = tfidf.fit_transform(combined_features)
-    
-    return tfidf_matrix
-
-# Function to get movie recommendations
-@st.cache_data
-def get_recommendations(movie_title, _df, tfidf_matrix, top_n=5):
-    # Get the index of the movie that matches the title
-    idx = _df[_df[movie_title_col] == movie_title].index[0]
-    
-    # Compute the cosine similarity matrix
-    sim_scores = list(enumerate(cosine_similarity(tfidf_matrix[idx:idx+1], tfidf_matrix)[0]))
-    
-    # Sort the movies based on the similarity scores
-    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
-    
-    # Get the scores of the top_n most similar movies (excluding the movie itself)
-    sim_scores = sim_scores[1:top_n+1]
-    
-    # Get the movie indices
-    movie_indices = [i[0] for i in sim_scores]
-    
-    # Return the top top_n most similar movies with their similarity scores
-    recommendations = _df.iloc[movie_indices].copy()
-    recommendations['Similarity'] = [i[1] for i in sim_scores]
-    
-    return recommendations
+# Apply filters to the DataFrame
 
 # Apply filters to the DataFrame
 filtered_df = df.copy()
@@ -242,9 +270,6 @@ st.markdown("<h2 class='sub-header'>Movies Catalog</h2>", unsafe_allow_html=True
 if len(filtered_df) == 0:
     st.warning("No movies found with the current filters. Try adjusting your search criteria.")
 else:
-    # Create feature matrix for recommendations
-    tfidf_matrix = create_feature_matrix(df)
-    
     # Display movie catalog
     movies_per_row = 3
     
@@ -286,39 +311,8 @@ else:
                             desc_col = next((col for col in movie.index if 'description' in col.lower() or 'plot' in col.lower()), None)
                             if desc_col:
                                 st.write(f"**Plot:** {movie[desc_col]}")
-                                
-                        # Get recommendations button
-                        if st.button(f"Get similar movies to {movie[movie_title_col]}", key=f"recommend_{idx}"):
-                            st.session_state.selected_movie = movie[movie_title_col]
-                            st.session_state.show_recommendations = True
 
     st.markdown("---")
-
-    # Show recommendations if requested
-    if 'show_recommendations' in st.session_state and st.session_state.show_recommendations:
-        st.markdown("<h2 class='sub-header'>Recommended Movies</h2>", unsafe_allow_html=True)
-        recommendations = get_recommendations(st.session_state.selected_movie, df, tfidf_matrix, top_n=6)
-        
-        st.markdown(f"<h3>Movies similar to <span class='highlight'>{st.session_state.selected_movie}</span></h3>", unsafe_allow_html=True)
-        
-        # Create rows of recommendations
-        for i in range(0, len(recommendations), movies_per_row):
-            cols = st.columns(movies_per_row)
-            
-            for j in range(movies_per_row):
-                idx = i + j
-                if idx < len(recommendations):
-                    movie = recommendations.iloc[idx]
-                    
-                    with cols[j]:
-                        with st.container():
-                            st.markdown(f"<div class='card'><p class='film-title'>{movie[movie_title_col]} ({movie.get('Year of Release', '')})</p></div>", unsafe_allow_html=True)
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.markdown(f"<p class='metric-label'>Rating</p><p class='metric-value'>⭐ {movie.get('Movie Rating', 'N/A')}</p>", unsafe_allow_html=True)
-                            with col2:
-                                similarity = movie['Similarity'] * 100
-                                st.markdown(f"<p class='metric-label'>Match</p><p class='metric-value'>{similarity:.1f}%</p>", unsafe_allow_html=True)
 
 # Data insights section
 with st.expander("📊 Movie Insights"):
@@ -371,8 +365,13 @@ with st.expander("📊 Movie Insights"):
 # Footer
 st.markdown("---")
 st.markdown("""
-<div style="text-align: center">
-    <p>Created with ❤️ using Streamlit and Python</p>
-    <p>Data source: IMDb Top 1000 Movies</p>
+<div class="footer">
+    <p class="footer-text">Created with ❤️ by <a href="https://sahilfolio.live/" target="_blank">Sahil</a></p>
+    <p class="footer-text">Built using Streamlit and Python</p>
+    <p class="footer-text">Data source: IMDb Top 1000 Movies</p>
+    <p class="footer-text">
+        <a href="https://sahilfolio.live/" target="_blank">Portfolio</a> • 
+        <a href="https://github.com/Sahilll94" target="_blank">GitHub</a>
+    </p>
 </div>
 """, unsafe_allow_html=True)
